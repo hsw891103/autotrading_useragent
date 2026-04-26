@@ -698,11 +698,20 @@ async def execute_order(request: Request, execute_req: ExecuteRequest):
             # TP 주문들
             tp_order_ids = []
             if request.tp_orders:
-                for tp in request.tp_orders:
+                total_entry_qty = Decimal(request.qty)
+                accumulated_rounded = Decimal("0")
+                for i, tp in enumerate(request.tp_orders):
+                    is_last = (i == len(request.tp_orders) - 1)
+                    if is_last:
+                        # 마지막 TP는 나머지 수량: 각 TP 내림 반올림으로 인한 잔량 손실 방지
+                        effective_qty = total_entry_qty - accumulated_rounded
+                    else:
+                        effective_qty = Decimal(str(tp["qty"]))
+                        accumulated_rounded += client.round_quantity(symbol, effective_qty)
                     tp_id = await client.place_tp_order(
                         symbol,
                         tp["side"],
-                        Decimal(str(tp["qty"])),
+                        effective_qty,
                         Decimal(str(tp["price"]))
                     )
                     if tp_id:
